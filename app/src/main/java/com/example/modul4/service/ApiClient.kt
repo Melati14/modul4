@@ -1,29 +1,35 @@
 package com.example.modul4.service
 
-import com.example.modul4.model.CatFactResponse
-import retrofit2.Response
-import retrofit2.http.GET
+import android.content.Context
+import okhttp3.Interceptor
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-interface ApiService {
-    @GET("fact")
-    suspend fun getRandomFact(): Response<CatFactResponse>
+object ApiClient {
+    private const val BASE_URL = "https://reqres.in/"
 
+    fun getApiService(context: Context): ApiService {
+        val tokenManager = TokenManager(context)
+
+        // Interceptor untuk menyisipkan Token
+        val authInterceptor = Interceptor { chain ->
+            val requestBuilder = chain.request().newBuilder()
+            tokenManager.getToken()?.let { token ->
+                requestBuilder.addHeader("Authorization", "Bearer $token")
+            }
+            chain.proceed(requestBuilder.build())
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+    }
 }
-
-    object ApiClient {
-        private const val BASE_URL = "https://catfact.ninja"
-
-        private val retrofit: Retrofit by lazy {
-            Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-        }
-
-        val apiService: ApiService by lazy {
-            retrofit.create(ApiService::class.java)
-        }
-
-        }
