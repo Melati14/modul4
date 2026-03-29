@@ -9,12 +9,18 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiClient {
     private const val BASE_URL = "https://reqres.in/"
 
+    private const val API_KEY = "reqres_bd652f63bb7a478680acb466fac66034"
+
     fun getApiService(context: Context): ApiService {
         val tokenManager = TokenManager(context)
 
-        // Interceptor untuk menyisipkan Token
+
         val authInterceptor = Interceptor { chain ->
             val requestBuilder = chain.request().newBuilder()
+
+            // Menambahkan x-Api-Key untuk semua request
+            requestBuilder.addHeader("x-api-key", API_KEY)
+
             tokenManager.getToken()?.let { token ->
                 requestBuilder.addHeader("Authorization", "Bearer $token")
             }

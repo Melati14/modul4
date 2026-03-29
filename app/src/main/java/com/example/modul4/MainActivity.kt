@@ -68,59 +68,83 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val apiService = remember { ApiClient.getApiService(context) }
     val tokenManager = remember { TokenManager(context) }
 
-    var email by remember { mutableStateOf("eve.holt@reqres.in") } // Kredensial default API
+    var email by remember { mutableStateOf("eve.holt@reqres.in") }
     var password by remember { mutableStateOf("cityslicka") }
     var isLoading by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(text = "Aplikasi Beresin", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(32.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Welcome 👋",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Text(
+                    text = "Masuk untuk melanjutkan",
+                    style = MaterialTheme.typography.bodyMedium
+                )
 
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Kata Sandi") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(32.dp))
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Email") },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-        Button(
-            onClick = {
-                isLoading = true
-                coroutineScope.launch {
-                    try {
-                        val response = apiService.loginUser(LoginRequest(email, password))
-                        if (response.isSuccessful && response.body() != null) {
-                            tokenManager.saveToken(response.body()!!.token)
-                            onLoginSuccess()
-                        } else {
-                            Toast.makeText(context, "Login Gagal", Toast.LENGTH_SHORT).show()
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Kata Sandi") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        isLoading = true
+                        coroutineScope.launch {
+                            try {
+                                val response = apiService.loginUser(LoginRequest(email, password))
+                                if (response.isSuccessful && response.body() != null) {
+                                    tokenManager.saveToken(response.body()!!.token)
+                                    onLoginSuccess()
+                                } else {
+                                    Toast.makeText(context, "Login Gagal", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Kesalahan Jaringan", Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isLoading = false
+                            }
                         }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Terjadi Kesalahan Jaringan",
-                            Toast.LENGTH_SHORT).show()
-                    } finally {
-                        isLoading = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    } else {
+                        Text("Masuk")
                     }
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            Text(if (isLoading) "Memproses..." else "Masuk")
+            }
         }
     }
 }
@@ -128,13 +152,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val apiService = remember { ApiClient.getApiService(context) }
 
     var users by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Memanggil API secara otomatis saat layar pertama kali dibuka
     LaunchedEffect(Unit) {
         try {
             val response = apiService.getUsers()
@@ -144,33 +167,89 @@ fun HomeScreen(onLogout: () -> Unit) {
                 errorMessage = "Gagal mengambil data"
             }
         } catch (e: Exception) {
-            errorMessage = "Terjadi Kesalahan Jaringan"
+            errorMessage = "Kesalahan jaringan"
+        } finally {
+            isLoading = false
         }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // App Bar Sederhana
+
+        // TOP BAR
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Daftar Pengguna", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onLogout) { Text("Keluar") }
+            Text("👥 Users", style = MaterialTheme.typography.titleLarge)
+            Button(onClick = onLogout) {
+                Text("Logout")
+            }
         }
 
-        // List Data (Pengganti RecyclerView)
-        if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, modifier = Modifier.padding(16.dp), color =
-                MaterialTheme.colorScheme.error)
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-                items(users) { user ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "${user.firstName} ${user.lastName}", style =
-                                MaterialTheme.typography.titleMedium)
-                            Text(text = user.email, style = MaterialTheme.typography.bodyMedium)
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            errorMessage.isNotEmpty() -> {
+                Text(
+                    errorMessage,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            users.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Tidak ada data")
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    items(users) { user ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            elevation = CardDefaults.cardElevation(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Avatar (inisial)
+                                Box(
+                                    modifier = Modifier
+                                        .size(50.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = user.firstName.first().toString(),
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Column {
+                                    Text(
+                                        "${user.firstName} ${user.lastName}",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Text(
+                                        user.email,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
                         }
                     }
                 }

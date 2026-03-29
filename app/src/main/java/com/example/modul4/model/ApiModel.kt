@@ -1,7 +1,6 @@
 package com.example.modul4.model
 
 import com.google.gson.annotations.SerializedName
-
 // Model Login
 data class LoginRequest(val email: String, val password: String)
 data class LoginResponse(val token: String)
