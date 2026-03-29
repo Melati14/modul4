@@ -9,7 +9,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiClient {
     private const val BASE_URL = "https://reqres.in/"
 
-    private const val API_KEY = "reqres_bd652f63bb7a478680acb466fac66034"
+    private const val API_KEY = "reqres_b9678a09eee34a8685515183fefb9a1a"
 
     fun getApiService(context: Context): ApiService {
         val tokenManager = TokenManager(context)
