@@ -1,5 +1,6 @@
 package com.example.modul4
 
+import android.app.AlertDialog
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.*
 import com.example.modul4.model.LoginRequest
 import com.example.modul4.model.User
+import com.example.modul4.model.UserRequest
 import com.example.modul4.service.ApiClient
 import com.example.modul4.service.TokenManager
 import kotlinx.coroutines.launch
@@ -87,7 +89,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Welcome 👋",
+                    text = "Beresin App",
                     style = MaterialTheme.typography.headlineMedium
                 )
                 Text(
@@ -152,102 +154,95 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val apiService = remember { ApiClient.getApiService(context) }
 
     var users by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        try {
-            val response = apiService.getUsers()
-            if (response.isSuccessful && response.body() != null) {
-                users = response.body()!!.data
-            } else {
-                errorMessage = "Gagal mengambil data"
+    var showDialog by remember { mutableStateOf(false) }
+    var selectedUser by remember { mutableStateOf<User?>(null) }
+
+    fun loadData() {
+        isLoading = true
+        coroutineScope.launch {
+            try {
+                val response = apiService.getUsers()
+                if (response.isSuccessful) {
+                    users = response.body()?.data ?: emptyList()
+                } else {
+                    errorMessage = "Gagal mengambil data"
+                }
+            } catch (e: Exception) {
+                errorMessage = "Kesalahan jaringan"
+            } finally {
+                isLoading = false
             }
-        } catch (e: Exception) {
-            errorMessage = "Kesalahan jaringan"
-        } finally {
-            isLoading = false
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect(Unit) { loadData() }
 
-        // TOP BAR
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("👥 Users", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onLogout) {
-                Text("Logout")
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                selectedUser = null
+                showDialog = true
+            }) {
+                Text("+", style = MaterialTheme.typography.headlineSmall)
             }
         }
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("👥 Users List", style = MaterialTheme.typography.titleLarge)
+                Button(onClick = onLogout) { Text("Logout") }
+            }
 
-        when {
-            isLoading -> {
+            if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            }
-
-            errorMessage.isNotEmpty() -> {
-                Text(
-                    errorMessage,
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            users.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Tidak ada data")
-                }
-            }
-
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
+            } else if (errorMessage.isNotEmpty()) {
+                Text(errorMessage, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
                     items(users) { user ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            elevation = CardDefaults.cardElevation(4.dp)
-                        ) {
+                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Avatar (inisial)
-                                Box(
-                                    modifier = Modifier
-                                        .size(50.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = user.firstName.first().toString(),
-                                        style = MaterialTheme.typography.titleLarge
-                                    )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("${user.firstName} ${user.lastName}", style = MaterialTheme.typography.titleMedium)
+                                    Text(user.email, style = MaterialTheme.typography.bodyMedium)
                                 }
+                                Row {
+                                    TextButton(onClick = {
+                                        selectedUser = user
+                                        showDialog = true
+                                    }) { Text("Ubah") }
 
-                                Spacer(modifier = Modifier.width(16.dp))
-
-                                Column {
-                                    Text(
-                                        "${user.firstName} ${user.lastName}",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        user.email,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    TextButton(onClick = {
+                                        coroutineScope.launch {
+                                            try {
+                                                val response = apiService.deleteUser(user.id)
+                                                if (response.isSuccessful) {
+                                                    Toast.makeText(context, "Berhasil dihapus", Toast.LENGTH_SHORT).show()
+                                                    loadData()
+                                                }
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Gagal menghapus", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
                                 }
                             }
                         }
@@ -256,4 +251,84 @@ fun HomeScreen(onLogout: () -> Unit) {
             }
         }
     }
+
+    if (showDialog) {
+        UserFormDialog(
+            initialName = selectedUser?.firstName ?: "",
+            isEditMode = selectedUser != null,
+            onDismiss = { showDialog = false },
+            onConfirm = { inputName, inputJob ->
+                showDialog = false
+                coroutineScope.launch {
+                    try {
+                        val requestData = UserRequest(inputName, inputJob)
+                        val response = if (selectedUser == null) {
+                            apiService.createUser(requestData)
+                        } else {
+                            apiService.updateUser(selectedUser!!.id, requestData)
+                        }
+
+                        if (response.isSuccessful) {
+                            Toast.makeText(context, "Data berhasil diproses", Toast.LENGTH_SHORT).show()
+                            loadData()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Kesalahan jaringan", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+    }
 }
+                @Composable
+                fun UserFormDialog(
+                    initialName: String = "",
+                    initialJob: String = "",
+                    isEditMode: Boolean = false,
+                    onDismiss: () -> Unit,
+                    onConfirm: (name: String, job: String) -> Unit
+                ) {
+                    var name by remember { mutableStateOf(initialName) }
+                    var job by remember { mutableStateOf(initialJob) }
+
+                    AlertDialog(
+                        onDismissRequest = onDismiss,
+                        title = { Text(if (isEditMode) "Ubah Pengguna" else "Tambah Pengguna Baru") },
+                        text = {
+                            Column {
+                                OutlinedTextField(
+                                    value = name,
+                                    onValueChange = { name = it },
+                                    label = { Text("Nama") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                OutlinedTextField(
+                                    value = job,
+                                    onValueChange = { job = it },
+                                    label = { Text("Pekerjaan") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(
+                                onClick = { onConfirm(name, job) },
+                                enabled = name.isNotBlank() && job.isNotBlank()
+                            ) {
+                                Text("Simpan")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = onDismiss) {
+                                Text("Batal")
+                            }
+                        }
+                    )
+                }
+
+
+
+
+
+

@@ -18,3 +18,16 @@ data class UserListResponse(
     val page: Int,
     val data: List<User>
 )
+
+data class UserRequest(
+    val name: String,
+    val job: String
+)
+
+data class UserResponse(
+    val id: String,
+    val name: String,
+    val job: String,
+    val createdAt: String?,
+    val updatedAt: String?
+)
